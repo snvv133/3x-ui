@@ -59,6 +59,13 @@ func (s *SubService) GetSubs(subId string, host string) ([]string, int64, xray.C
 		s.datepicker = "gregorian"
 	}
 	for _, inbound := range inbounds {
+		// Hysteria2 has no clients array; emit one link per inbound and move on.
+		if inbound.Protocol == model.Hysteria2 {
+			if link := s.genHysteria2Link(inbound); link != "" {
+				result = append(result, link)
+			}
+			continue
+		}
 		clients, err := s.inboundService.GetClients(inbound)
 		if err != nil {
 			logger.Error("SubService - GetClients: Unable to get clients from inbound")
@@ -115,14 +122,21 @@ func (s *SubService) GetSubs(subId string, host string) ([]string, int64, xray.C
 func (s *SubService) getInboundsBySubId(subId string) ([]*model.Inbound, error) {
 	db := database.GetDB()
 	var inbounds []*model.Inbound
+	// Two unioned matches:
+	//   1. Xray protocols where any element of settings.clients has the subId
+	//   2. Hysteria2 inbounds where settings.subId == ? (single-user model)
 	err := db.Model(model.Inbound{}).Preload("ClientStats").Where(`id in (
 		SELECT DISTINCT inbounds.id
 		FROM inbounds,
-			JSON_EACH(JSON_EXTRACT(inbounds.settings, '$.clients')) AS client 
+			JSON_EACH(JSON_EXTRACT(inbounds.settings, '$.clients')) AS client
 		WHERE
 			protocol in ('vmess','vless','trojan','shadowsocks')
 			AND JSON_EXTRACT(client.value, '$.subId') = ? AND enable = ?
-	)`, subId, true).Find(&inbounds).Error
+	) OR id in (
+		SELECT id FROM inbounds
+		WHERE protocol = 'hysteria2'
+			AND JSON_EXTRACT(settings, '$.subId') = ? AND enable = ?
+	)`, subId, true, subId, true).Find(&inbounds).Error
 	if err != nil {
 		return nil, err
 	}
@@ -1196,4 +1210,50 @@ func getHostFromXFH(s string) (string, error) {
 		return realHost, nil
 	}
 	return s, nil
+}
+
+// genHysteria2Link builds a hysteria2:// URI for a single managed Hy2 inbound.
+// Mirrors the JS genHysteria2Link in web/assets/js/model/inbound.js so the
+// share link surfaced from the panel and the one served from /sub/ are
+// byte-equivalent.
+func (s *SubService) genHysteria2Link(inbound *model.Inbound) string {
+	cfg, err := service.ParseHysteria2Settings(inbound.Settings)
+	if err != nil || cfg == nil || cfg.Password == "" {
+		return ""
+	}
+
+	addr := inbound.Listen
+	if addr == "" || addr == "0.0.0.0" || addr == "::" {
+		addr = s.address
+	}
+	portStr := fmt.Sprintf("%d", inbound.Port)
+	if cfg.PortHoppingRange != "" {
+		portStr = fmt.Sprintf("%d,%s", inbound.Port, cfg.PortHoppingRange)
+	}
+
+	q := url.Values{}
+	q.Set("insecure", "1")
+	if cfg.ObfsPassword != "" {
+		q.Set("obfs", "salamander")
+		q.Set("obfs-password", cfg.ObfsPassword)
+	}
+	masq := cfg.MasqueradeURL
+	if masq == "" {
+		masq = "https://www.bing.com"
+	}
+	if u, err := url.Parse(masq); err == nil && u.Host != "" {
+		q.Set("sni", u.Hostname())
+	}
+
+	remark := inbound.Remark
+	if remark == "" {
+		remark = "hysteria2"
+	}
+	return fmt.Sprintf("hysteria2://%s@%s:%s/?%s#%s",
+		url.QueryEscape(cfg.Password),
+		addr,
+		portStr,
+		q.Encode(),
+		url.QueryEscape(remark),
+	)
 }

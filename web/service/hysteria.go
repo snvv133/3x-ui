@@ -35,6 +35,14 @@ type Hysteria2Settings struct {
 	PortHoppingRange       string `json:"portHoppingRange,omitempty"` // e.g. "20000-50000"
 	OutboundSocks5         string `json:"outboundSocks5,omitempty"`   // e.g. "127.0.0.1:1080"
 	OutboundSocks5RouteAll bool   `json:"outboundSocks5RouteAll,omitempty"`
+	// SubID, if non-empty, makes this inbound show up in /sub/{subId} responses.
+	SubID string `json:"subId,omitempty"`
+}
+
+// ParseHysteria2Settings is the public helper used by the subscription service
+// to read the same shape that HysteriaService writes.
+func ParseHysteria2Settings(raw string) (*Hysteria2Settings, error) {
+	return (&HysteriaService{}).parseSettings(raw)
 }
 
 // HysteriaService applies an Inbound of protocol hysteria2 to the system.

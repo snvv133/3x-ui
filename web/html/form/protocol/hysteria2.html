@@ -99,5 +99,18 @@
         </template>
         <a-switch v-model="inbound.settings.outboundSocks5RouteAll"></a-switch>
     </a-form-item>
+
+    <a-divider :style="{ margin: '8px 0' }">订阅</a-divider>
+
+    <a-form-item>
+        <template slot="label">
+            <a-tooltip>
+                <template slot="title">填了之后，访问 /sub/{这个值} 就会返回这个 Hy2 节点。可以和其他协议的 client 共用同一个 subId，让一个订阅链接同时包含 vless+hy2。</template>
+                订阅 ID (subId)
+                <a-icon type="sync" @click="inbound.settings.subId = RandomUtil.randomSeq(16)"></a-icon>
+            </a-tooltip>
+        </template>
+        <a-input v-model.trim="inbound.settings.subId" placeholder="留空 = 不暴露在订阅里"></a-input>
+    </a-form-item>
 </a-form>
 {{end}}

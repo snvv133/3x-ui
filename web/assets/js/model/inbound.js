@@ -2753,6 +2753,7 @@ Inbound.Hysteria2Settings = class extends XrayCommonClass {
         portHoppingRange = '',
         outboundSocks5 = '',
         outboundSocks5RouteAll = false,
+        subId = '',
     ) {
         super(protocol);
         this.password = password;
@@ -2764,6 +2765,7 @@ Inbound.Hysteria2Settings = class extends XrayCommonClass {
         this.portHoppingRange = portHoppingRange;
         this.outboundSocks5 = outboundSocks5;
         this.outboundSocks5RouteAll = outboundSocks5RouteAll;
+        this.subId = subId;
     }
 
     static fromJson(json = {}) {
@@ -2778,6 +2780,7 @@ Inbound.Hysteria2Settings = class extends XrayCommonClass {
             json.portHoppingRange,
             json.outboundSocks5,
             json.outboundSocks5RouteAll,
+            json.subId,
         );
     }
 
@@ -2792,6 +2795,7 @@ Inbound.Hysteria2Settings = class extends XrayCommonClass {
             portHoppingRange: this.portHoppingRange || undefined,
             outboundSocks5: this.outboundSocks5 || undefined,
             outboundSocks5RouteAll: this.outboundSocks5RouteAll || undefined,
+            subId: this.subId || undefined,
         };
     }
 };
