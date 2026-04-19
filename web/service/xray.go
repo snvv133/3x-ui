@@ -113,6 +113,11 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		if !inbound.Enable {
 			continue
 		}
+		// External (non-Xray) protocols are managed by their own systemd unit
+		// and must not be added to the Xray config.
+		if inbound.Protocol.IsExternalProtocol() {
+			continue
+		}
 		// get settings clients
 		settings := map[string]any{}
 		json.Unmarshal([]byte(inbound.Settings), &settings)

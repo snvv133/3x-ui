@@ -299,6 +299,17 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 	}
 
 	needRestart := false
+
+	// Externally-managed protocols (Hysteria2 etc.) are applied via their own
+	// service and never affect the Xray runtime.
+	if inbound.Protocol.IsExternalProtocol() {
+		if err1 := applyExternalInbound(inbound); err1 != nil {
+			logger.Warning("apply external inbound failed:", err1)
+			return inbound, false, err1
+		}
+		return inbound, false, err
+	}
+
 	if inbound.Enable {
 		s.xrayApi.Init(p.GetAPIPort())
 		inboundJson, err1 := json.MarshalIndent(inbound.GenXrayInboundConfig(), "", "  ")
@@ -319,11 +330,41 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 	return inbound, needRestart, err
 }
 
+// applyExternalInbound dispatches to the appropriate sidecar service for
+// non-Xray protocols. Currently only hysteria2 is supported.
+func applyExternalInbound(inbound *model.Inbound) error {
+	switch inbound.Protocol {
+	case model.Hysteria2:
+		return (&HysteriaService{}).Apply(inbound)
+	}
+	return nil
+}
+
+// stopExternalInbound stops the sidecar service backing this inbound.
+func stopExternalInbound(inbound *model.Inbound) error {
+	switch inbound.Protocol {
+	case model.Hysteria2:
+		return (&HysteriaService{}).Stop()
+	}
+	return nil
+}
+
 // DelInbound deletes an inbound configuration by ID.
 // It removes the inbound from the database and the running Xray instance if active.
 // Returns whether Xray needs restart and any error.
 func (s *InboundService) DelInbound(id int) (bool, error) {
 	db := database.GetDB()
+
+	// External protocols: stop the sidecar before deleting from DB.
+	if existing, err := s.GetInbound(id); err == nil && existing.Protocol.IsExternalProtocol() {
+		if err1 := stopExternalInbound(existing); err1 != nil {
+			logger.Warning("stop external inbound failed:", err1)
+		}
+		if err1 := db.Where("inbound_id = ?", id).Delete(xray.ClientTraffic{}).Error; err1 != nil {
+			return false, err1
+		}
+		return false, db.Delete(model.Inbound{}, id).Error
+	}
 
 	var tag string
 	needRestart := false
@@ -486,6 +527,18 @@ func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, 
 		oldInbound.Tag = fmt.Sprintf("inbound-%v", inbound.Port)
 	} else {
 		oldInbound.Tag = fmt.Sprintf("inbound-%v:%v", inbound.Listen, inbound.Port)
+	}
+
+	// External protocols: persist to DB then re-render the sidecar config.
+	if oldInbound.Protocol.IsExternalProtocol() || inbound.Protocol.IsExternalProtocol() {
+		if err1 := tx.Save(oldInbound).Error; err1 != nil {
+			return inbound, false, err1
+		}
+		if err1 := applyExternalInbound(oldInbound); err1 != nil {
+			logger.Warning("apply external inbound failed:", err1)
+			return inbound, false, err1
+		}
+		return inbound, false, nil
 	}
 
 	needRestart := false
