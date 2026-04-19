@@ -1,0 +1,103 @@
+{{define "form/hysteria2"}}
+<a-form :colon="false" :label-col="{ md: {span:8} }" :wrapper-col="{ md: {span:14} }">
+    <a-alert type="info" show-icon
+        message="Hysteria2 由独立的 hysteria-server systemd 服务承载，保存后会自动写入 /etc/hysteria/config.yaml 并重启服务。"
+        :style="{ marginBottom: '12px' }"></a-alert>
+
+    <a-form-item>
+        <template slot="label">
+            <a-tooltip>
+                <template slot="title">客户端连接所需的认证密码。建议长度 ≥16。</template>
+                密码
+                <a-icon type="sync" @click="inbound.settings.password = RandomUtil.randomSeq(16)"></a-icon>
+            </a-tooltip>
+        </template>
+        <a-input v-model.trim="inbound.settings.password"></a-input>
+    </a-form-item>
+
+    <a-form-item>
+        <template slot="label">
+            <a-tooltip>
+                <template slot="title">Salamander 流量混淆密码。留空 = 不混淆。客户端必须填写相同值。</template>
+                混淆密码 (obfs)
+                <a-icon type="sync" @click="inbound.settings.obfsPassword = RandomUtil.randomSeq(16)"></a-icon>
+            </a-tooltip>
+        </template>
+        <a-input v-model.trim="inbound.settings.obfsPassword" placeholder="留空表示不启用混淆"></a-input>
+    </a-form-item>
+
+    <a-form-item>
+        <template slot="label">
+            <a-tooltip>
+                <template slot="title">主动探测时返回的伪装站点。任何 https URL，但 Cloudflare/Bing 等大站效果较好。</template>
+                伪装 URL
+                <a-icon type="question-circle"></a-icon>
+            </a-tooltip>
+        </template>
+        <a-input v-model.trim="inbound.settings.masqueradeUrl" placeholder="https://www.bing.com"></a-input>
+    </a-form-item>
+
+    <a-divider :style="{ margin: '8px 0' }">带宽 (Brutal CC)</a-divider>
+
+    <a-form-item>
+        <template slot="label">
+            <a-tooltip>
+                <template slot="title">服务端到客户端的最大带宽 (Mbps)。0 表示不限制。建议填实际线路上限。</template>
+                上行 (Mbps)
+                <a-icon type="question-circle"></a-icon>
+            </a-tooltip>
+        </template>
+        <a-input-number v-model.number="inbound.settings.upMbps" :min="0" :max="10000"></a-input-number>
+    </a-form-item>
+
+    <a-form-item label="下行 (Mbps)">
+        <a-input-number v-model.number="inbound.settings.downMbps" :min="0" :max="10000"></a-input-number>
+    </a-form-item>
+
+    <a-form-item>
+        <template slot="label">
+            <a-tooltip>
+                <template slot="title">关闭 = 客户端可以宣布自己想要的带宽（推荐）。开启 = 强制使用上面的值。</template>
+                忽略客户端带宽
+                <a-icon type="question-circle"></a-icon>
+            </a-tooltip>
+        </template>
+        <a-switch v-model="inbound.settings.ignoreClientBandwidth"></a-switch>
+    </a-form-item>
+
+    <a-divider :style="{ margin: '8px 0' }">高级</a-divider>
+
+    <a-form-item>
+        <template slot="label">
+            <a-tooltip>
+                <template slot="title">通过 iptables NAT 把一段端口范围全部转发到 listen 端口。绕过单端口 UDP QoS。需要服务器手动添加 iptables 规则；面板不会自动配。例：20000-50000</template>
+                端口跳跃范围
+                <a-icon type="question-circle"></a-icon>
+            </a-tooltip>
+        </template>
+        <a-input v-model.trim="inbound.settings.portHoppingRange" placeholder="留空 = 不启用"></a-input>
+    </a-form-item>
+
+    <a-form-item>
+        <template slot="label">
+            <a-tooltip>
+                <template slot="title">让 Hy2 出站走指定 SOCKS5 代理（例如本机 WARP 容器 127.0.0.1:1080）。留空 = 直连服务器网卡。</template>
+                出站 SOCKS5
+                <a-icon type="question-circle"></a-icon>
+            </a-tooltip>
+        </template>
+        <a-input v-model.trim="inbound.settings.outboundSocks5" placeholder="例 127.0.0.1:1080"></a-input>
+    </a-form-item>
+
+    <a-form-item v-if="inbound.settings.outboundSocks5">
+        <template slot="label">
+            <a-tooltip>
+                <template slot="title">开启后所有 Hy2 流量都走上面的 SOCKS5。关闭 = 只定义 outbound，不路由。</template>
+                全部流量走该 SOCKS5
+                <a-icon type="question-circle"></a-icon>
+            </a-tooltip>
+        </template>
+        <a-switch v-model="inbound.settings.outboundSocks5RouteAll"></a-switch>
+    </a-form-item>
+</a-form>
+{{end}}

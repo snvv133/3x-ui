@@ -152,6 +152,11 @@
     {{template "form/tun"}}
 </template>
 
+<!-- hysteria2 (managed external systemd unit) -->
+<template v-if="inbound.protocol === Protocols.HYSTERIA2">
+    {{template "form/hysteria2"}}
+</template>
+
 <!-- stream settings -->
 <template v-if="inbound.canEnableStream()">
     {{template "form/streamSettings"}}

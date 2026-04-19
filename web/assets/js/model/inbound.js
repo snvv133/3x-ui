@@ -8,6 +8,7 @@ const Protocols = {
     HTTP: 'http',
     WIREGUARD: 'wireguard',
     TUN: 'tun',
+    HYSTERIA2: 'hysteria2',
 };
 
 const SSMethods = {
@@ -1775,8 +1776,34 @@ class Inbound extends XrayCommonClass {
                 });
                 return links.join('\r\n');
             }
+            if (this.protocol == Protocols.HYSTERIA2) {
+                return this.genHysteria2Link(addr, this.port, remark);
+            }
             return '';
         }
+    }
+
+    // Build a hysteria2:// share URI from the panel-side settings.
+    // Self-signed certs require insecure=1; if a real domain/cert is later
+    // wired in, the user can flip insecure manually in the client.
+    genHysteria2Link(addr, port, remark) {
+        const s = this.settings || {};
+        const password = encodeURIComponent(s.password || '');
+        const params = new URLSearchParams();
+        params.set('insecure', '1');
+        if (s.obfsPassword) {
+            params.set('obfs', 'salamander');
+            params.set('obfs-password', s.obfsPassword);
+        }
+        try {
+            const sni = new URL(s.masqueradeUrl || 'https://www.bing.com').hostname;
+            if (sni) params.set('sni', sni);
+        } catch (_) { /* ignore malformed url */ }
+        let portStr = String(port);
+        if (s.portHoppingRange) {
+            portStr = port + ',' + s.portHoppingRange;
+        }
+        return `hysteria2://${password}@${addr}:${portStr}/?${params.toString()}#${encodeURIComponent(remark)}`;
     }
 
     static fromJson(json = {}) {
@@ -1827,6 +1854,7 @@ Inbound.Settings = class extends XrayCommonClass {
             case Protocols.HTTP: return new Inbound.HttpSettings(protocol);
             case Protocols.WIREGUARD: return new Inbound.WireguardSettings(protocol);
             case Protocols.TUN: return new Inbound.TunSettings(protocol);
+            case Protocols.HYSTERIA2: return new Inbound.Hysteria2Settings(protocol);
             default: return null;
         }
     }
@@ -1842,6 +1870,7 @@ Inbound.Settings = class extends XrayCommonClass {
             case Protocols.HTTP: return Inbound.HttpSettings.fromJson(json);
             case Protocols.WIREGUARD: return Inbound.WireguardSettings.fromJson(json);
             case Protocols.TUN: return Inbound.TunSettings.fromJson(json);
+            case Protocols.HYSTERIA2: return Inbound.Hysteria2Settings.fromJson(json);
             default: return null;
         }
     }
@@ -2705,6 +2734,64 @@ Inbound.TunSettings = class extends Inbound.Settings {
             name: this.name || 'xray0',
             mtu: this.mtu || 1500,
             userLevel: this.userLevel || 0,
+        };
+    }
+};
+
+// Hysteria2Settings is the panel-side shape for a managed Hy2 inbound.
+// Fields here are persisted JSON-encoded into Inbound.settings and consumed
+// by web/service/hysteria.go on save.
+Inbound.Hysteria2Settings = class extends XrayCommonClass {
+    constructor(
+        protocol,
+        password = RandomUtil.randomSeq(16),
+        obfsPassword = '',
+        masqueradeUrl = 'https://www.bing.com',
+        upMbps = 0,
+        downMbps = 0,
+        ignoreClientBandwidth = false,
+        portHoppingRange = '',
+        outboundSocks5 = '',
+        outboundSocks5RouteAll = false,
+    ) {
+        super(protocol);
+        this.password = password;
+        this.obfsPassword = obfsPassword;
+        this.masqueradeUrl = masqueradeUrl;
+        this.upMbps = upMbps;
+        this.downMbps = downMbps;
+        this.ignoreClientBandwidth = ignoreClientBandwidth;
+        this.portHoppingRange = portHoppingRange;
+        this.outboundSocks5 = outboundSocks5;
+        this.outboundSocks5RouteAll = outboundSocks5RouteAll;
+    }
+
+    static fromJson(json = {}) {
+        return new Inbound.Hysteria2Settings(
+            Protocols.HYSTERIA2,
+            json.password,
+            json.obfsPassword,
+            json.masqueradeUrl,
+            json.upMbps,
+            json.downMbps,
+            json.ignoreClientBandwidth,
+            json.portHoppingRange,
+            json.outboundSocks5,
+            json.outboundSocks5RouteAll,
+        );
+    }
+
+    toJson() {
+        return {
+            password: this.password,
+            obfsPassword: this.obfsPassword || undefined,
+            masqueradeUrl: this.masqueradeUrl || undefined,
+            upMbps: this.upMbps || undefined,
+            downMbps: this.downMbps || undefined,
+            ignoreClientBandwidth: this.ignoreClientBandwidth || undefined,
+            portHoppingRange: this.portHoppingRange || undefined,
+            outboundSocks5: this.outboundSocks5 || undefined,
+            outboundSocks5RouteAll: this.outboundSocks5RouteAll || undefined,
         };
     }
 };

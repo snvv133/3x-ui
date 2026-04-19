@@ -123,6 +123,14 @@
             originalLink: l
           });
         });
+      } else if (this.inbound.protocol == Protocols.HYSTERIA2) {
+        const link = this.inbound.genInboundLinks(dbInbound.remark);
+        this.qrcodes.push({
+          remark: dbInbound.remark || 'hysteria2',
+          link: link,
+          useIPv4: false,
+          originalLink: link
+        });
       } else {
         this.inbound.genAllLinks(this.dbInbound.remark, app.remarkModel, client).forEach(l => {
           this.qrcodes.push({
