@@ -669,6 +669,8 @@
       }
       if (this.inbound.protocol == Protocols.WIREGUARD) {
         this.links = this.inbound.genInboundLinks(dbInbound.remark).split('\r\n')
+      } else if (this.inbound.protocol == Protocols.HYSTERIA2) {
+        this.links = [this.inbound.genInboundLinks(dbInbound.remark)];
       } else {
         this.links = this.inbound.genAllLinks(this.dbInbound.remark, app.remarkModel, this.clientSettings);
       }
