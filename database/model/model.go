@@ -21,7 +21,16 @@ const (
 	Shadowsocks Protocol = "shadowsocks"
 	Mixed       Protocol = "mixed"
 	WireGuard   Protocol = "wireguard"
+	// Hysteria2 is a non-Xray protocol managed as an external systemd service.
+	Hysteria2 Protocol = "hysteria2"
 )
+
+// IsExternalProtocol reports whether the protocol is managed outside of Xray
+// (e.g. by a separate systemd unit). Such inbounds must not be added to the
+// generated Xray config.
+func (p Protocol) IsExternalProtocol() bool {
+	return p == Hysteria2
+}
 
 // User represents a user account in the 3x-ui panel.
 type User struct {
